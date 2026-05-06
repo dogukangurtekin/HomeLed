@@ -1,0 +1,194 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>LED Dimmer</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;color:#fff;}
+  .topbar{width:100%;background:#1a1a1a;padding:16px 20px 12px;text-align:center;border-bottom:1px solid #2a2a2a;}
+  .topbar h1{font-size:17px;font-weight:500;letter-spacing:0.3px;}
+  .topbar p{font-size:12px;color:#6b7280;margin-top:4px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:5px;vertical-align:middle;}
+  .body{display:flex;flex-direction:column;align-items:center;gap:28px;padding:40px 20px;width:100%;max-width:380px;}
+  .ring{width:150px;height:150px;border-radius:50%;border:3px solid #374151;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:border-color 0.4s,background 0.4s;}
+  .ring svg{width:48px;height:48px;}
+  .ring-label{font-size:11px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280;transition:color 0.3s;}
+  .slider-wrap{width:100%;}
+  .slider-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .slider-label span:first-child{font-size:13px;color:#9ca3af;}
+  .slider-label span:last-child{font-size:20px;font-weight:500;color:#f59e0b;}
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:8px;border-radius:4px;background:#374151;outline:none;cursor:pointer;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:28px;height:28px;border-radius:50%;background:#f59e0b;cursor:pointer;transition:transform 0.1s;}
+  input[type=range]::-webkit-slider-thumb:active{transform:scale(1.15);}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;width:100%;}
+  .btn{padding:15px 0;border-radius:12px;border:none;font-size:14px;font-weight:500;cursor:pointer;transition:opacity 0.15s,transform 0.1s;}
+  .btn:active{transform:scale(0.97);}
+  .btn-on{background:#f59e0b;color:#000;}
+  .btn-off{background:#1f2937;color:#9ca3af;}
+  .btn-mid{background:#374151;color:#e5e7eb;}
+  .preset-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;}
+  .preset{padding:10px 0;border-radius:10px;border:1px solid #374151;background:transparent;color:#9ca3af;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,color 0.15s;}
+  .preset:active{transform:scale(0.97);}
+  .preset:hover{background:#1f2937;color:#e5e7eb;}
+  .info-card{width:100%;background:#1a1a1a;border-radius:12px;border:1px solid #2a2a2a;overflow:hidden;}
+  .info-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid #2a2a2a;}
+  .info-row:last-child{border-bottom:none;}
+  .info-label{color:#6b7280;font-size:13px;}
+  .info-val{color:#e5e7eb;font-size:13px;font-weight:500;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1f2937;color:#e5e7eb;padding:10px 22px;border-radius:20px;font-size:13px;transition:transform 0.3s;border:1px solid #374151;pointer-events:none;white-space:nowrap;}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .fade-bar{width:100%;height:4px;border-radius:2px;background:#374151;overflow:hidden;}
+  .fade-fill{height:100%;background:#f59e0b;transition:width 0.1s;border-radius:2px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>LED Dimmer</h1>
+  <p><span class="dot"></span>ESP32-WROOM-32 — L298N</p>
+</div>
+
+<div class="body">
+
+  <div class="ring" id="ring" onclick="toggleOnOff()">
+    <svg viewBox="0 0 48 48" fill="none">
+      <ellipse id="bulb" cx="24" cy="20" rx="12" ry="13" fill="#374151" style="transition:fill 0.4s"/>
+      <rect x="19" y="32" width="10" height="4" rx="2" fill="#4b5563"/>
+      <rect x="19.5" y="36" width="9" height="3.5" rx="1.5" fill="#4b5563"/>
+      <line id="r1" x1="24" y1="6"  x2="24" y2="3"   stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0" style="transition:opacity 0.4s"/>
+      <line id="r2" x1="14" y1="9"  x2="12" y2="7"   stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0" style="transition:opacity 0.4s"/>
+      <line id="r3" x1="34" y1="9"  x2="36" y2="7"   stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0" style="transition:opacity 0.4s"/>
+      <line id="r4" x1="9"  y1="20" x2="6"  y2="20"  stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0" style="transition:opacity 0.4s"/>
+      <line id="r5" x1="39" y1="20" x2="42" y2="20"  stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" opacity="0" style="transition:opacity 0.4s"/>
+    </svg>
+    <div class="ring-label" id="lbl">Kapalı</div>
+  </div>
+
+  <div class="fade-bar">
+    <div class="fade-fill" id="fadebar" style="width:0%"></div>
+  </div>
+
+  <div class="slider-wrap">
+    <div class="slider-label">
+      <span>Parlaklik</span>
+      <span id="val-lbl">0%</span>
+    </div>
+    <input type="range" min="0" max="255" value="0" id="slider"
+      oninput="sliderChange(this.value)"
+      onchange="sendVal(this.value)">
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-on"  onclick="setVal(255)">Tam Aç</button>
+    <button class="btn btn-mid" onclick="setVal(128)">%50</button>
+    <button class="btn btn-off" onclick="setVal(0)">Kapat</button>
+  </div>
+
+  <div class="preset-row">
+    <button class="preset" onclick="setVal(26)">%10</button>
+    <button class="preset" onclick="setVal(64)">%25</button>
+    <button class="preset" onclick="setVal(179)">%70</button>
+    <button class="preset" onclick="setVal(230)">%90</button>
+  </div>
+
+  <div class="info-card">
+    <div class="info-row">
+      <span class="info-label">Parlaklik</span>
+      <span class="info-val" id="pct-val">%0</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">PWM değeri</span>
+      <span class="info-val" id="pwm-val">0 / 255</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Durum</span>
+      <span class="info-val" id="durum-val" style="color:#6b7280">Kapalı</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Sürücü</span>
+      <span class="info-val">L298N</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Voltaj çıkış</span>
+      <span class="info-val">~10V (2V kayıp)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Cihaz</span>
+      <span class="info-val">ESP32-WROOM-32</span>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var sliderTimer = null;
+var oncekiDeger = 0;
+
+function sliderChange(v) {
+  updateUI(parseInt(v));
+  clearTimeout(sliderTimer);
+  sliderTimer = setTimeout(function(){ sendVal(v); }, 120);
+}
+
+function updateUI(v) {
+  var pct = Math.round(v / 255 * 100);
+  var rays = ['r1','r2','r3','r4','r5'];
+  var op = v / 255;
+
+  document.getElementById('val-lbl').textContent   = pct + '%';
+  document.getElementById('pct-val').textContent   = '%' + pct;
+  document.getElementById('pwm-val').textContent   = v + ' / 255';
+  document.getElementById('fadebar').style.width   = pct + '%';
+  document.getElementById('slider').value          = v;
+
+  document.getElementById('bulb').setAttribute('fill', v > 0 ? '#f59e0b' : '#374151');
+  document.getElementById('ring').style.borderColor = v > 0 ? '#f59e0b' : '#374151';
+  document.getElementById('ring').style.background  = v > 0 ? 'rgba(245,158,11,0.06)' : 'transparent';
+  document.getElementById('lbl').textContent        = pct > 0 ? pct + '%' : 'Kapalı';
+  document.getElementById('lbl').style.color        = v > 0 ? '#f59e0b' : '#6b7280';
+
+  var durumEl = document.getElementById('durum-val');
+  durumEl.textContent  = v > 0 ? 'Açık' : 'Kapalı';
+  durumEl.style.color  = v > 0 ? '#22c55e' : '#6b7280';
+
+  rays.forEach(function(id) {
+    document.getElementById(id).style.opacity = op;
+  });
+}
+
+function sendVal(v) {
+  v = parseInt(v);
+  fetch('/parlaklik?v=' + v)
+    .then(function() { showToast(v > 0 ? 'Parlaklik: %' + Math.round(v/255*100) : 'LED kapatıldı'); })
+    .catch(function() { showToast('Baglanti hatasi!'); });
+  updateUI(v);
+  oncekiDeger = v;
+}
+
+function setVal(v) {
+  sendVal(v);
+}
+
+function toggleOnOff() {
+  if (parseInt(document.getElementById('slider').value) > 0) {
+    sendVal(0);
+  } else {
+    sendVal(oncekiDeger > 0 ? oncekiDeger : 255);
+  }
+}
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.classList.remove('show'); }, 2000);
+}
+</script>
+</body>
+</html>
